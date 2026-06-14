@@ -4,16 +4,27 @@
 // API - 采集接口调用
 // ===================================
 const api = {
-  baseURL: '/api.php/provide/vod/at/josn/',
+  // 修复：baseURL 不以 / 结尾
+  baseURL: '/api.php/provide/vod/at/josn',
 
   async get(endpoint, params = {}) {
-    const url = new URL(this.baseURL + endpoint);
-    Object.entries(params).forEach(([key, value]) => {
-      url.searchParams.set(key, value);
-    });
+    // 修复：正确拼接 URL
+    let url = this.baseURL;
+    if (endpoint && endpoint !== '') {
+      url = url + '/' + endpoint;
+    }
+
+    // 添加查询参数
+    const paramsStr = Object.entries(params)
+      .map(([key, value]) => key + '=' + encodeURIComponent(value))
+      .join('&');
+
+    if (paramsStr) {
+      url = url + '?' + paramsStr;
+    }
 
     try {
-      const response = await fetch(url.toString());
+      const response = await fetch(url);
       if (!response.ok) throw new Error('API 错误：' + response.status);
       return await response.json();
     } catch (error) {
@@ -236,7 +247,6 @@ function openPlayer(vod) {
 function extractPlayURL(playURL) {
   if (!playURL) return '';
 
-  // 尝试提取 http/https 开头的 URL
   const match = playURL.match(/(https?:\/\/[^#\s]+)/);
   return match ? match[1] : '';
 }
@@ -319,7 +329,6 @@ function updateActiveTab(category) {
 }
 
 function getCategoryByTab(tab) {
-  // 需要根据采集接口的实际分类 ID 调整
   const categoryMap = {
     'movie': '1',
     'tv': '2',
