@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="高品质观影网站，兼容苹果 CMS v10">
+  <title>观影网站</title>
+
+  <!-- 预加载字体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=selecte r" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <header class="header">
+    <div class="header-container">
+      <a href="/" class="logo">
+        <span class="logo-text">观影</span>
+      </a>
+
+      <nav class="nav" id="nav">
+        <a href="/?category=movie" class="nav-link">电影</a>
+        <a href="/?category=tv" class="nav-link">电视剧</a>
+        <a href="/?category=anime" class="nav-link">动漫</a>
+        <a href="/?category=documentary" class="nav-link">纪录片</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="search-btn" id="searchBtn" aria-label="搜索">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+        </button>
+        <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+          <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+          </svg>
+          <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 搜索框 -->
+  <div class="search-overlay" id="searchOverlay">
+    <div class="search-container">
+      <input 
+        type="text" 
+        class="search-input" 
+        id="searchInput" 
+        placeholder="搜索电影、电视剧..."
+        autocomplete="off"
+      >
+      <button class="search-submit" id="searchSubmit">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <main class="main">
+    <!-- 分类筛选 -->
+    <section class="filter-section">
+      <div class="filter-container">
+        <h2 class="section-title">热门内容</h2>
+        <div class="filter-tabs" id="filterTabs">
+          <button class="tab active" data-type="vod">全部</button>
+          <button class="tab" data-type="movie">电影</button>
+          <button class="tab" data-type="tv">电视剧</button>
+          <button class="tab" data-type="anime">动漫</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 视频列表 -->
+    <section class="video-section">
+      <div class="video-container" id="videoContainer">
+        <!-- 动态加载内容 -->
+        <div class="loading" id="loading">
+          <div class="loading-spinner"></div>
+          <p>正在加载内容...</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部 -->
+  <footer class="footer">
+    <div class="footer-container">
+      <p class="footer-text">观影网站 © 2024</p>
+      <p class="footer-note">本站内容来自苹果 CMS v10 接口</p>
+    </div>
+  </footer>
+
+  <!-- 播放器弹窗 -->
+  <div class="player-modal" id="playerModal">
+    <div class="player-content">
+      <div class="player-header">
+        <h3 class="player-title" id="playerTitle"></h3>
+        <button class="player-close" id="playerClose">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6 6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="player-wrapper" id="playerWrapper">
+        <!-- 播放器嵌入 -->
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
