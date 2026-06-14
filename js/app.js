@@ -1,49 +1,25 @@
-// 观影网站 - 前端主逻辑 (适配采集接口)
+// 观影网站 - 前端主逻辑 (直接包含 API)
 
 // ===================================
-// 状态管理
-// ===================================
-const state = {
-  currentCategory: '',
-  currentPage: 1,
-  currentTab: 'vod',
-  searchQuery: '',
-  theme: 'light'
-};
-
-// ===================================
-// DOM 元素
-// ===================================
-const elements = {
-  videoContainer: document.getElementById('videoContainer'),
-  loading: document.getElementById('loading'),
-  filterTabs: document.querySelectorAll('.tab'),
-  searchBtn: document.getElementById('searchBtn'),
-  searchOverlay: document.getElementById('searchOverlay'),
-  searchInput: document.getElementById('searchInput'),
-  searchSubmit: document.getElementById('searchSubmit'),
-  themeToggle: document.getElementById('themeToggle'),
-  playerModal: document.getElementById('playerModal'),
-  playerClose: document.getElementById('playerClose'),
-  playerTitle: document.getElementById('playerTitle'),
-  playerWrapper: document.getElementById('playerWrapper')
-};
-
-// ===================================
-// API - 直接使用采集接口
+// API - 采集接口调用
 // ===================================
 const api = {
   baseURL: '/api.php/provide/vod/at/josn/',
 
   async get(endpoint, params = {}) {
-    const url = new URL(`${this.baseURL}${endpoint}`);
+    const url = new URL(this.baseURL + endpoint);
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.set(key, value);
     });
 
-    const response = await fetch(url.toString());
-    if (!response.ok) throw new Error(`API 错误: ${response.status}`);
-    return await response.json();
+    try {
+      const response = await fetch(url.toString());
+      if (!response.ok) throw new Error('API 错误：' + response.status);
+      return await response.json();
+    } catch (error) {
+      console.error('API 请求失败:', error);
+      throw error;
+    }
   },
 
   async getVodList(params = {}) {
@@ -67,42 +43,87 @@ const api = {
 };
 
 // ===================================
+// 状态管理
+// ===================================
+const state = {
+  currentCategory: '',
+  currentPage: 1,
+  currentTab: 'vod',
+  searchQuery: '',
+  theme: 'light'
+};
+
+// ===================================
+// DOM 元素
+// ===================================
+let elements = {};
+
+function initElements() {
+  elements = {
+    videoContainer: document.getElementById('videoContainer'),
+    loading: document.getElementById('loading'),
+    filterTabs: document.querySelectorAll('.tab'),
+    searchBtn: document.getElementById('searchBtn'),
+    searchOverlay: document.getElementById('searchOverlay'),
+    searchInput: document.getElementById('searchInput'),
+    searchSubmit: document.getElementById('searchSubmit'),
+    themeToggle: document.getElementById('themeToggle'),
+    playerModal: document.getElementById('playerModal'),
+    playerClose: document.getElementById('playerClose'),
+    playerTitle: document.getElementById('playerTitle'),
+    playerWrapper: document.getElementById('playerWrapper')
+  };
+}
+
+// ===================================
 // 初始化
 // ===================================
 async function init() {
+  initElements();
   loadThemePreference();
   bindEvents();
   await loadInitialContent();
 }
 
 function bindEvents() {
+  if (!elements.filterTabs) return;
+
   elements.filterTabs.forEach(tab => {
     tab.addEventListener('click', () => handleTabChange(tab));
   });
 
-  elements.searchBtn.addEventListener('click', () => openSearch());
-  elements.searchSubmit.addEventListener('click', () => handleSearch());
-  elements.searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') handleSearch();
-  });
+  if (elements.searchBtn) elements.searchBtn.addEventListener('click', () => openSearch());
+  if (elements.searchSubmit) elements.searchSubmit.addEventListener('click', () => handleSearch());
+  if (elements.searchInput) {
+    elements.searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSearch();
+    });
+  }
 
-  elements.themeToggle.addEventListener('click', toggleTheme);
-  elements.playerClose.addEventListener('click', closePlayer);
-  elements.playerModal.addEventListener('click', (e) => {
-    if (e.target === elements.playerModal) closePlayer();
-  });
+  if (elements.themeToggle) elements.themeToggle.addEventListener('click', toggleTheme);
+  if (elements.playerClose) elements.playerClose.addEventListener('click', closePlayer);
+  if (elements.playerModal) {
+    elements.playerModal.addEventListener('click', (e) => {
+      if (e.target === elements.playerModal) closePlayer();
+    });
+  }
 }
 
 async function loadInitialContent() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const category = urlParams.get('category');
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const category = urlParams.get('category');
 
-  if (category) {
-    state.currentCategory = category;
-    updateActiveTab(category);
+    if (category) {
+      state.currentCategory = category;
+      updateActiveTab(category);
+    }
+
+    await loadVodList();
+  } catch (error) {
+    console.error('初始化失败:', error);
+    showError('初始化失败');
   }
-
-  await loadVodList();
 }
 
 // ===================================
@@ -125,18 +146,16 @@ async function loadVodList() {
 
     const result = await api.getVodList(params);
 
-    // 采集接口返回格式：{ code: 200, msg: "ok", list: [...] }
-    if (result.code === 200 && result.list) {
-      renderVideoList(result.list);
-    } else if (result.list) {
-      // 有些采集接口直接返回 { list: [...] }
+    console.log('API 返回:', result);
+
+    if (result && result.list && result.list.length > 0) {
       renderVideoList(result.list);
     } else {
       showError('暂无数据');
     }
   } catch (error) {
     console.error('加载视频列表失败:', error);
-    showError('加载失败，请重试');
+    showError('加载失败：' + error.message);
   } finally {
     hideLoading();
   }
@@ -146,6 +165,8 @@ async function loadVodList() {
 // 渲染视频列表
 // ===================================
 function renderVideoList(vodList) {
+  if (!elements.videoContainer) return;
+
   elements.videoContainer.innerHTML = '';
 
   if (!vodList || vodList.length === 0) {
@@ -162,11 +183,9 @@ function renderVideoList(vodList) {
 function createVideoCard(vod) {
   const card = document.createElement('article');
   card.className = 'video-card';
-  card.setAttribute('data-id', vod.vod_id);
 
   const poster = vod.vod_pic || 'https://via.placeholder.com/200x280/eeeeee/999999?text=No+Image';
   const rating = vod.vod_score || 0;
-  const ratingStar = rating > 0 ? '★' : '';
 
   card.innerHTML = `
     <div class="video-poster">
@@ -177,12 +196,7 @@ function createVideoCard(vod) {
       <h3 class="video-title">${vod.vod_name}</h3>
       <div class="video-meta">
         ${vod.vod_type ? `<span class="video-type">${vod.vod_type}</span>` : ''}
-        ${rating > 0 ? `
-          <span class="video-rating">
-            <span class="rating-star">${ratingStar}</span>
-            <span>${rating}</span>
-          </span>
-        ` : ''}
+        ${rating > 0 ? `<span class="video-rating">★ ${rating}</span>` : ''}
       </div>
     </div>
   `;
@@ -195,11 +209,12 @@ function createVideoCard(vod) {
 // 播放器
 // ===================================
 function openPlayer(vod) {
+  if (!elements.playerModal || !elements.playerWrapper || !elements.playerTitle) return;
+
   state.currentPlaying = vod;
   elements.playerTitle.textContent = vod.vod_name;
 
-  // 采集接口的播放 URL 通常在 vod_play_url
-  const playURL = vod.vod_play_url;
+  const playURL = vod.vod_play_url || vod.vod_url;
   const playerSrc = extractPlayURL(playURL);
 
   if (playerSrc) {
@@ -222,15 +237,13 @@ function extractPlayURL(playURL) {
   if (!playURL) return '';
 
   // 尝试提取 http/https 开头的 URL
-  const urlMatch = playURL.match(/(https?:\/\/[^#\s]+)/);
-  if (urlMatch) {
-    return urlMatch[1];
-  }
-
-  return '';
+  const match = playURL.match(/(https?:\/\/[^#\s]+)/);
+  return match ? match[1] : '';
 }
 
 function closePlayer() {
+  if (!elements.playerModal || !elements.playerWrapper) return;
+
   elements.playerModal.classList.remove('active');
   elements.playerWrapper.innerHTML = '';
   state.currentPlaying = null;
@@ -240,19 +253,22 @@ function closePlayer() {
 // 搜索
 // ===================================
 function openSearch() {
+  if (!elements.searchOverlay || !elements.searchInput) return;
   elements.searchOverlay.classList.add('active');
   elements.searchInput.focus();
 }
 
 function closeSearch() {
+  if (!elements.searchOverlay) return;
   elements.searchOverlay.classList.remove('active');
-  elements.searchInput.value = '';
+  if (elements.searchInput) elements.searchInput.value = '';
   state.searchQuery = '';
 }
 
 async function handleSearch() {
-  const query = elements.searchInput.value.trim();
+  if (!elements.searchInput) return;
 
+  const query = elements.searchInput.value.trim();
   if (!query) {
     closeSearch();
     return;
@@ -265,16 +281,14 @@ async function handleSearch() {
   try {
     const result = await api.searchVod(query, 1);
 
-    if (result.code === 200 && result.list) {
-      renderVideoList(result.list);
-    } else if (result.list) {
+    if (result && result.list && result.list.length > 0) {
       renderVideoList(result.list);
     } else {
       showError('没有找到相关结果');
     }
   } catch (error) {
     console.error('搜索失败:', error);
-    showError('搜索失败，请重试');
+    showError('搜索失败');
   } finally {
     hideLoading();
   }
@@ -286,7 +300,7 @@ async function handleSearch() {
 function handleTabChange(tab) {
   state.currentTab = tab.dataset.type;
 
-  elements.filterTabs.forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   tab.classList.add('active');
 
   state.currentPage = 1;
@@ -294,10 +308,10 @@ function handleTabChange(tab) {
 }
 
 function updateActiveTab(category) {
-  elements.filterTabs.forEach(tab => {
-    if (tab.dataset.type === category || category === tab.dataset.type) {
+  document.querySelectorAll('.tab').forEach(tab => {
+    if (tab.dataset.type === category) {
       tab.classList.add('active');
-      state.currentTab = tab.dataset.type;
+      state.currentTab = category;
     } else {
       tab.classList.remove('active');
     }
@@ -307,9 +321,9 @@ function updateActiveTab(category) {
 function getCategoryByTab(tab) {
   // 需要根据采集接口的实际分类 ID 调整
   const categoryMap = {
-    'movie': '1',   // 电影分类 ID
-    'tv': '2',      // 电视剧分类 ID
-    'anime': '3'    // 动漫分类 ID
+    'movie': '1',
+    'tv': '2',
+    'anime': '3'
   };
 
   return categoryMap[tab] || '';
@@ -346,19 +360,15 @@ function hideLoading() {
 }
 
 function showError(message) {
+  if (!elements.videoContainer) return;
   elements.videoContainer.innerHTML = `<p class="text-center">${message}</p>`;
 }
 
 // ===================================
 // 启动应用
 // ===================================
-document.addEventListener('DOMContentLoaded', init);
-
-if (typeof window !== 'undefined') {
-  window.viewingSite = {
-    state,
-    api,
-    openPlayer,
-    closePlayer
-  };
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
 }
