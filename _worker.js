@@ -12,13 +12,12 @@ export default {
     const shouldProxy = url.pathname.startsWith('/api.php');
 
     if (!shouldProxy) {
-      // 返回本地静态页面
       return await handleStaticRequest(url);
     }
 
-    // 构建目标 URL - 替换路径中的部分
+    // 构建目标 URL
     const targetPath = url.pathname;
-    const targetUrl = new URL(`${CAIJI_PROTOCOL}://${CAIJI_HOSTNAME}${targetPath}${url.search}`);
+    const targetUrl = CAIJI_PROTOCOL + '://' + CAIJI_HOSTNAME + targetPath + url.search;
 
     // 创建新的请求
     const newRequest = new Request(targetUrl, {
@@ -46,7 +45,7 @@ export default {
 
 // 处理本地静态请求
 async function handleStaticRequest(url) {
-  const path = url.pathname.replace(/^\/, '/');
+  const path = url.pathname.substring(1);
 
   try {
     const file = await assetStorage.get(path);
@@ -58,7 +57,6 @@ async function handleStaticRequest(url) {
     }
   } catch (e) {}
 
-  // 返回 404
   return new Response('File not found', { 
     status: 404,
     headers: { 'content-type': 'text/plain' }
