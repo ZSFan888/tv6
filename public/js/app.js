@@ -1,5 +1,4 @@
-// 观影网站 - 前端主逻辑
-import { api } from './api.js';
+// 观影网站 - 前端主逻辑 (适配采集接口)
 
 // ===================================
 // 状态管理
@@ -31,36 +30,63 @@ const elements = {
 };
 
 // ===================================
+// API - 直接使用采集接口
+// ===================================
+const api = {
+  baseURL: '/api.php/provide/vod/at/josn/',
+
+  async get(endpoint, params = {}) {
+    const url = new URL(`${this.baseURL}${endpoint}`);
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+
+    const response = await fetch(url.toString());
+    if (!response.ok) throw new Error(`API 错误: ${response.status}`);
+    return await response.json();
+  },
+
+  async getVodList(params = {}) {
+    return this.get('', {
+      t: params.t || '',
+      pg: params.pg || 1,
+      limit: params.limit || 20
+    });
+  },
+
+  async searchVod(wd, pg = 1) {
+    return this.get('', {
+      wd: wd,
+      pg: pg
+    });
+  },
+
+  async getCategories() {
+    return this.get('', { t: 0 });
+  }
+};
+
+// ===================================
 // 初始化
 // ===================================
 async function init() {
-  // 加载主题偏好
   loadThemePreference();
-
-  // 绑定事件
   bindEvents();
-
-  // 加载初始内容
   await loadInitialContent();
 }
 
 function bindEvents() {
-  // 筛选标签
   elements.filterTabs.forEach(tab => {
     tab.addEventListener('click', () => handleTabChange(tab));
   });
 
-  // 搜索
   elements.searchBtn.addEventListener('click', () => openSearch());
   elements.searchSubmit.addEventListener('click', () => handleSearch());
   elements.searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') handleSearch();
   });
 
-  // 主题切换
   elements.themeToggle.addEventListener('click', toggleTheme);
-
-  // 播放器关闭
   elements.playerClose.addEventListener('click', closePlayer);
   elements.playerModal.addEventListener('click', (e) => {
     if (e.target === elements.playerModal) closePlayer();
@@ -68,17 +94,14 @@ function bindEvents() {
 }
 
 async function loadInitialContent() {
-  // 从 URL 获取分类参数
   const urlParams = new URLSearchParams(window.location.search);
   const category = urlParams.get('category');
 
   if (category) {
     state.currentCategory = category;
-    // 激活对应的标签
     updateActiveTab(category);
   }
 
-  // 加载视频列表
   await loadVodList();
 }
 
@@ -94,7 +117,6 @@ async function loadVodList() {
       limit: 20
     };
 
-    // 根据标签类型调整参数
     if (state.currentTab !== 'vod' && state.currentCategory) {
       params.t = getCategoryByTab(state.currentTab);
     } else if (state.currentCategory) {
@@ -103,7 +125,11 @@ async function loadVodList() {
 
     const result = await api.getVodList(params);
 
-    if (result.code === 1 && result.list) {
+    // 采集接口返回格式：{ code: 200, msg: "ok", list: [...] }
+    if (result.code === 200 && result.list) {
+      renderVideoList(result.list);
+    } else if (result.list) {
+      // 有些采集接口直接返回 { list: [...] }
       renderVideoList(result.list);
     } else {
       showError('暂无数据');
@@ -138,10 +164,7 @@ function createVideoCard(vod) {
   card.className = 'video-card';
   card.setAttribute('data-id', vod.vod_id);
 
-  // 海报图片 (使用默认图如果为空)
   const poster = vod.vod_pic || 'https://via.placeholder.com/200x280/eeeeee/999999?text=No+Image';
-
-  // 评分
   const rating = vod.vod_score || 0;
   const ratingStar = rating > 0 ? '★' : '';
 
@@ -164,9 +187,7 @@ function createVideoCard(vod) {
     </div>
   `;
 
-  // 点击播放
   card.addEventListener('click', () => openPlayer(vod));
-
   return card;
 }
 
@@ -175,31 +196,29 @@ function createVideoCard(vod) {
 // ===================================
 function openPlayer(vod) {
   state.currentPlaying = vod;
-
   elements.playerTitle.textContent = vod.vod_name;
 
-  // 嵌入播放器 (使用通用的播放器 iframe)
-  // 这里需要根据你的苹果 CMS 实际播放器地址调整
+  // 采集接口的播放 URL 通常在 vod_play_url
   const playURL = vod.vod_play_url;
   const playerSrc = extractPlayURL(playURL);
 
-  elements.playerWrapper.innerHTML = `
-    <iframe 
-      src="${playerSrc}" 
-      frameborder="0" 
-      allowfullscreen="true"
-      allow="autoplay; fullscreen"
-    ></iframe>
-  `;
-
-  elements.playerModal.classList.add('active');
+  if (playerSrc) {
+    elements.playerWrapper.innerHTML = `
+      <iframe 
+        src="${playerSrc}" 
+        frameborder="0" 
+        allowfullscreen="true"
+        allow="autoplay; fullscreen"
+        style="width:100%;height:100%;border:none;"
+      ></iframe>
+    `;
+    elements.playerModal.classList.add('active');
+  } else {
+    showError('暂无播放地址');
+  }
 }
 
 function extractPlayURL(playURL) {
-  // 苹果 CMS 的播放 URL 格式通常是：
-  // 分组名$标题#url1#url2...
-  // 这里提取第一个播放 URL
-
   if (!playURL) return '';
 
   // 尝试提取 http/https 开头的 URL
@@ -208,7 +227,6 @@ function extractPlayURL(playURL) {
     return urlMatch[1];
   }
 
-  // 如果没有找到完整 URL，返回空
   return '';
 }
 
@@ -242,13 +260,14 @@ async function handleSearch() {
 
   state.searchQuery = query;
   closeSearch();
-
   showLoading();
 
   try {
     const result = await api.searchVod(query, 1);
 
-    if (result.code === 1 && result.list) {
+    if (result.code === 200 && result.list) {
+      renderVideoList(result.list);
+    } else if (result.list) {
       renderVideoList(result.list);
     } else {
       showError('没有找到相关结果');
@@ -267,11 +286,9 @@ async function handleSearch() {
 function handleTabChange(tab) {
   state.currentTab = tab.dataset.type;
 
-  // 更新激活状态
   elements.filterTabs.forEach(t => t.classList.remove('active'));
   tab.classList.add('active');
 
-  // 重新加载内容
   state.currentPage = 1;
   loadVodList();
 }
@@ -288,8 +305,7 @@ function updateActiveTab(category) {
 }
 
 function getCategoryByTab(tab) {
-  // 根据标签类型返回对应的分类 ID
-  // 这里需要根据你的苹果 CMS 实际分类 ID 调整
+  // 需要根据采集接口的实际分类 ID 调整
   const categoryMap = {
     'movie': '1',   // 电影分类 ID
     'tv': '2',      // 电视剧分类 ID
@@ -338,7 +354,6 @@ function showError(message) {
 // ===================================
 document.addEventListener('DOMContentLoaded', init);
 
-// 全局暴露 (调试用)
 if (typeof window !== 'undefined') {
   window.viewingSite = {
     state,

@@ -1,30 +1,24 @@
-// Cloudflare Workers 反向代理 - 兼容苹果 CMS v10
-// 将你的苹果 CMS v10 站点域名配置在这里
-const PROXY_HOSTNAME = 'your-maccms10-site.com';  // 修改为你的苹果 CMS 域名
-const PROXY_PROTOCOL = 'https';
+// Cloudflare Workers - 采集接口代理
+// 专门代理 dbzy5 采集接口
+
+const CAIJI_HOSTNAME = 'caiji.dbzy5.com';
+const CAIJI_PROTOCOL = 'https';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request) {
     const url = new URL(request.url);
 
-    // 只代理特定路径 (苹果 CMS API 路径)
-    const apiPaths = [
-      '/api.php',
-      '/index.php',
-      '/template/',
-      '/static/',
-      '/upload/'
-    ];
-
-    const shouldProxy = apiPaths.some(path => url.pathname.startsWith(path));
+    // 只代理采集接口路径
+    const shouldProxy = url.pathname.startsWith('/api.php');
 
     if (!shouldProxy) {
       // 返回本地静态页面
-      return await handleStaticRequest(request, url);
+      return await handleStaticRequest(url);
     }
 
-    // 构建目标 URL
-    const targetUrl = new URL(`${PROXY_PROTOCOL}://${PROXY_HOSTNAME}${url.pathname}${url.search}`);
+    // 构建目标 URL - 替换路径中的部分
+    const targetPath = url.pathname;
+    const targetUrl = new URL(`${CAIJI_PROTOCOL}://${CAIJI_HOSTNAME}${targetPath}${url.search}`);
 
     // 创建新的请求
     const newRequest = new Request(targetUrl, {
@@ -33,11 +27,12 @@ export default {
       body: request.body
     });
 
-    // 发送请求到目标服务器
+    // 发送请求到采集接口
     const response = await fetch(newRequest);
 
-    // 修改响应头，移除安全限制
+    // 修改响应头
     const newHeaders = new Headers(response.headers);
+    newHeaders.set('content-type', 'application/json; charset=utf-8');
     newHeaders.delete('x-frame-options');
     newHeaders.delete('content-security-policy');
 
@@ -50,35 +45,23 @@ export default {
 };
 
 // 处理本地静态请求
-async function handleStaticRequest(request, url) {
+async function handleStaticRequest(url) {
   const path = url.pathname.replace(/^\/, '/');
 
   try {
     const file = await assetStorage.get(path);
     if (file) {
+      const contentType = getContentType(path);
       return new Response(file, {
-        headers: {
-          'content-type': getContentType(path)
-        }
+        headers: { 'content-type': contentType }
       });
     }
   } catch (e) {}
 
-  // 返回默认首页
-  return new Response(`
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>观影网站</title>
-    </head>
-    <body>
-      <h1>观影网站正在加载...</h1>
-    </body>
-    </html>
-  `, {
-    headers: { 'content-type': 'text/html' }
+  // 返回 404
+  return new Response('File not found', { 
+    status: 404,
+    headers: { 'content-type': 'text/plain' }
   });
 }
 
